@@ -1,5 +1,4 @@
 const { Client } = require('@notionhq/client');
-
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const TASKS_DB_ID = process.env.NOTION_TASKS_DB_ID;
 
@@ -9,16 +8,23 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  
   if (req.method === 'GET') {
     try {
-      const response = await notion.databases.query({
+      const { projectId } = req.query;
+      const queryParams = {
         database_id: TASKS_DB_ID,
         sorts: [
           { property: 'Order', direction: 'ascending' },
           { timestamp: 'created_time', direction: 'ascending' }
         ]
-      });
+      };
+      if (projectId) {
+        queryParams.filter = {
+          property: 'Project',
+          relation: { contains: projectId }
+        };
+      }
+      const response = await notion.databases.query(queryParams);
       const tasks = response.results.map(page => ({
         id: page.id,
         name: page.properties.Name?.title?.[0]?.text?.content || 'Untitled',
@@ -37,7 +43,7 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { name, status, priority, dueDate, order, notes } = req.body;
+      const { name, status, priority, dueDate, order, notes, projectId } = req.body;
       const page = await notion.pages.create({
         parent: { database_id: TASKS_DB_ID },
         properties: {
@@ -47,6 +53,7 @@ module.exports = async (req, res) => {
           ...(dueDate && { 'Due Date': { date: { start: dueDate } } }),
           ...(order !== undefined && { Order: { number: order } }),
           ...(notes && { Notes: { rich_text: [{ text: { content: notes } }] } }),
+          ...(projectId && { Project: { relation: [{ id: projectId }] } }),
         }
       });
       return res.json({ id: page.id });
@@ -54,4 +61,6 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 };
