@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#6c63ff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Task Manager</title>
+  <link rel="manifest" href="/manifest.json" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --surface2: #252540;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --danger: #f87171;
+      --success: #4ade80;
+      --warn: #fb923c;
+      --high: #f87171;
+      --med: #fb923c;
+      --low: #60a5fa;
+      --done-color: #4ade80;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--surface);
+      padding: 14px 16px 12px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid #ffffff12;
+    }
+    header h1 { flex: 1; font-size: 1.2rem; font-weight: 700; }
+    .header-btn {
+      background: var(--surface2); border: none; color: var(--text);
+      width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: background 0.2s;
+    }
+    .header-btn:active { background: var(--accent); }
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--success); flex-shrink: 0;
+    }
+    #status-dot.loading { background: var(--warn); animation: pulse 1s infinite; }
+    #status-dot.error { background: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── Filters ── */
+    .filters {
+      display: flex; gap: 8px; padding: 12px 16px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filter-btn {
+      flex-shrink: 0; padding: 6px 16px; border-radius: 20px;
+      border: 1px solid #ffffff20; background: transparent;
+      color: var(--text-muted); font-size: 0.85rem; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .filter-btn.active {
+      background: var(--accent); border-color: var(--accent);
+      color: #fff; font-weight: 600;
+    }
+
+    /* ── Task list ── */
+    #task-list {
+      padding: 4px 16px 120px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .task-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px 14px 12px;
+      border-left: 3px solid transparent;
+      display: flex; gap: 12px; align-items: flex-start;
+      animation: fadeIn 0.2s ease;
+    }
+    .task-card.done { opacity: 0.55; border-left-color: var(--done-color) !important; }
+    .task-card.in-progress { border-left-color: var(--warn); }
+    .task-card[data-priority="High"] { border-left-color: var(--high); }
+    .task-card[data-priority="Medium"] { border-left-color: var(--med); }
+    .task-card[data-priority="Low"] { border-left-color: var(--low); }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+    .task-check {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid var(--text-muted); background: transparent;
+      cursor: pointer; flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center;
+      transition: all 0.2s; margin-top: 1px;
+    }
+    .task-check.checked { background: var(--success); border-color: var(--success); }
+    .task-check.checked::after { content: '✓'; color: #000; font-size: 0.75rem; font-weight: 700; }
+    .task-check.in-progress { border-color: var(--warn); }
+    .task-check.in-progress::after { content: '⟳'; color: var(--warn); font-size: 0.85rem; }
+
+    .task-body { flex: 1; min-width: 0; }
+    .task-name {
+      font-size: 0.95rem; font-weight: 500; line-height: 1.3;
+      word-break: break-word;
+    }
+    .task-card.done .task-name { text-decoration: line-through; }
+    .task-meta {
+      display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge {
+      font-size: 0.7rem; padding: 2px 8px; border-radius: 10px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .badge-high { background: #f871711a; color: var(--high); }
+    .badge-med  { background: #fb923c1a; color: var(--med); }
+    .badge-low  { background: #60a5fa1a; color: var(--low); }
+    .badge-date { background: #ffffff10; color: var(--text-muted); font-weight: 400; text-transform: none; }
+    .badge-overdue { background: #f871711a; color: var(--high); }
+    .badge-notes { background: #6c63ff20; color: var(--accent2); font-weight: 400; text-transform: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .task-del {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 1.1rem; cursor: pointer; padding: 2px 4px;
+      border-radius: 6px; transition: color 0.2s;
+      flex-shrink: 0;
+    }
+    .task-del:active { color: var(--danger); }
+
+    .empty-state {
+      text-align: center; color: var(--text-muted);
+      padding: 60px 20px; font-size: 0.95rem;
+    }
+    .empty-state .emoji { font-size: 3rem; display: block; margin-bottom: 12px; }
+
+    /* ── FABs ── */
+    .fabs {
+      position: fixed; bottom: 24px; right: 20px;
+      display: flex; flex-direction: column; gap: 12px; align-items: flex-end;
+    }
+    .fab {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .fab:active { transform: scale(0.93); }
+    .fab-add { background: var(--accent); color: #fff; }
+    .fab-voice { background: var(--surface2); color: var(--text); font-size: 1.6rem; }
+    .fab-voice.listening { background: var(--danger); animation: pulse 0.8s infinite; }
+    .fab-speak { background: var(--surface2); color: var(--text); font-size: 1.3rem; }
+    .fab-speak.speaking { background: var(--accent); color: #fff; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 100; display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); width: 100%;
+      border-radius: 20px 20px 0 0; padding: 20px 20px 32px;
+      transform: translateY(100%); transition: transform 0.3s ease;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; }
+    .modal-row { margin-bottom: 12px; }
+    .modal-row label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%; background: var(--surface2); border: 1px solid #ffffff15;
+      color: var(--text); border-radius: 10px; padding: 10px 12px;
+      font-size: 0.95rem; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    textarea { resize: none; height: 60px; }
+    select option { background: var(--surface); }
+
+    .modal-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .voice-input-row {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .voice-input-row input { flex: 1; }
+    .btn-mic {
+      width: 44px; height: 44px; border-radius: 10px; border: none;
+      background: var(--surface2); color: var(--text);
+      font-size: 1.2rem; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .btn-mic.listening { background: var(--danger); animation: pulse 0.8s infinite; }
+
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); color: var(--text);
+      padding: 10px 20px; border-radius: 20px; font-size: 0.85rem;
+      opacity: 0; transition: all 0.3s; z-index: 200; white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4); pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Voice transcript overlay ── */
+    #voice-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,0.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    #voice-overlay.active { opacity: 1; pointer-events: all; }
+    .voice-circle {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: var(--danger); display: flex; align-items: center;
+      justify-content: center; font-size: 2.5rem;
+      animation: voicePulse 1.2s ease-in-out infinite;
+    }
+    @keyframes voicePulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.4); }
+      50% { box-shadow: 0 0 0 24px rgba(248,113,113,0); }
+    }
+    #voice-transcript {
+      color: #fff; font-size: 1.1rem; text-align: center;
+      max-width: 80%; min-height: 1.5em; font-style: italic;
+    }
+    .voice-hint { color: var(--text-muted); font-size: 0.85rem; }
+    #voice-cancel {
+      padding: 10px 28px; border-radius: 20px;
+      background: var(--surface2); border: none; color: var(--text);
+      font-size: 0.9rem; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <span id="status-dot" class="loading" title="Connecting..."></span>
+  <h1>My Tasks</h1>
+  <button class="header-btn" id="btn-refresh" title="Refresh">↻</button>
+</header>
+
+<!-- Filters -->
+<div class="filters">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="To Do">To Do</button>
+  <button class="filter-btn" data-filter="In Progress">In Progress</button>
+  <button class="filter-btn" data-filter="Done">Done</button>
+</div>
+
+<!-- Task List -->
+<div id="task-list">
+  <div class="empty-state"><span class="emoji">⏳</span>Loading tasks…</div>
+</div>
+
+<!-- FABs -->
+<div class="fabs">
+  <button class="fab fab-speak" id="fab-speak" title="Read tasks aloud">🔊</button>
+  <button class="fab fab-voice" id="fab-voice" title="Voice add task">🎤</button>
+  <button class="fab fab-add" id="fab-add" title="Add task">＋</button>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Add Task</h2>
+
+    <div class="modal-row">
+      <label>Task name</label>
+      <div class="voice-input-row">
+        <input type="text" id="task-name" placeholder="What needs doing?" autocomplete="off" />
+        <button class="btn-mic" id="modal-mic" title="Dictate task name">🎤</button>
+      </div>
+    </div>
+
+    <div class="modal-row-2">
+      <div class="modal-row" style="margin:0">
+        <label>Priority</label>
+        <select id="task-priority">
+          <option value="">— None —</option>
+          <option value="High">🔴 High</option>
+          <option value="Medium">🟠 Medium</option>
+          <option value="Low">🔵 Low</option>
+        </select>
+      </div>
+      <div class="modal-row" style="margin:0">
+        <label>Due date</label>
+        <input type="date" id="task-due" />
+      </div>
+    </div>
+
+    <div class="modal-row" style="margin-top:12px">
+      <label>Notes (optional)</label>
+      <textarea id="task-notes" placeholder="Any extra details…"></textarea>
+    </div>
+
+    <div class="modal-row" style="margin-top:12px">
+      <label>Order # (optional)</label>
+      <input type="text" id="task-order" placeholder="e.g. 1, 2, 3…" inputmode="numeric" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Full-screen Voice Overlay (quick add via FAB) -->
+<div id="voice-overlay">
+  <div class="voice-circle">🎤</div>
+  <div id="voice-transcript">Listening…</div>
+  <div class="voice-hint">Say the task name clearly</div>
+  <button id="voice-cancel">Cancel</button>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let tasks = [];
+let currentFilter = 'all';
+let editingId = null;
+let recognition = null;
+let synth = window.speechSynthesis;
+let isSpeaking = false;
+
+// ─── DOM ────────────────────────────────────────────────────────────────────
+const taskList     = document.getElementById('task-list');
+const statusDot    = document.getElementById('status-dot');
+const modalOverlay = document.getElementById('modal-overlay');
+const modalTitle   = document.getElementById('modal-title');
+const taskName     = document.getElementById('task-name');
+const taskPriority = document.getElementById('task-priority');
+const taskDue      = document.getElementById('task-due');
+const taskNotes    = document.getElementById('task-notes');
+const taskOrder    = document.getElementById('task-order');
+const voiceOverlay = document.getElementById('voice-overlay');
+const voiceTranscript = document.getElementById('voice-transcript');
+const fabVoice     = document.getElementById('fab-voice');
+const fabSpeak     = document.getElementById('fab-speak');
+const toast        = document.getElementById('toast');
+
+// ─── API helpers ────────────────────────────────────────────────────────────
+const api = {
+  async get(url)         { const r = await fetch(url); return r.json(); },
+  async post(url, body)  { const r = await fetch(url, { method:'POST',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); return r.json(); },
+  async patch(url, body) { const r = await fetch(url, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); return r.json(); },
+  async del(url)         { const r = await fetch(url, { method:'DELETE' }); return r.json(); },
+};
+
+// ─── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, dur = 2500) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), dur);
+}
+
+// ─── Load tasks ─────────────────────────────────────────────────────────────
+async function loadTasks() {
+  setStatus('loading');
+  try {
+    const data = await api.get('/api/tasks');
+    tasks = data.tasks || [];
+    setStatus('ok');
+    renderTasks();
+  } catch (e) {
+    setStatus('error');
+    showToast('⚠️ Failed to load tasks');
+    taskList.innerHTML = '<div class="empty-state"><span class="emoji">⚠️</span>Could not connect. Check your connection.</div>';
+  }
+}
+
+function setStatus(state) {
+  statusDot.className = '';
+  if (state === 'loading') statusDot.classList.add('loading');
+  if (state === 'error')   statusDot.classList.add('error');
+  statusDot.title = state === 'ok' ? 'Connected' : state === 'loading' ? 'Loading…' : 'Error';
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderTasks() {
+  let filtered = tasks;
+  if (currentFilter !== 'all') {
+    filtered = tasks.filter(t => t.status === currentFilter);
+  }
+  if (!filtered.length) {
+    taskList.innerHTML = `<div class="empty-state"><span class="emoji">✅</span>${currentFilter === 'Done' ? 'Nothing completed yet!' : currentFilter === 'all' ? 'No tasks yet. Tap ＋ to add one.' : 'No tasks in this category.'}</div>`;
+    return;
+  }
+  taskList.innerHTML = filtered.map(t => taskCard(t)).join('');
+  // attach events
+  taskList.querySelectorAll('.task-check').forEach(el => {
+    el.addEventListener('click', () => cycleStatus(el.dataset.id, el.dataset.status));
+  });
+  taskList.querySelectorAll('.task-del').forEach(el => {
+    el.addEventListener('click', () => deleteTask(el.dataset.id));
+  });
+  taskList.querySelectorAll('.task-name').forEach(el => {
+    el.addEventListener('click', () => openEditModal(el.dataset.id));
+  });
+}
+
+function taskCard(t) {
+  const isDone = t.status === 'Done';
+  const isIP   = t.status === 'In Progress';
+  const checkClass = isDone ? 'checked' : isIP ? 'in-progress' : '';
+  const cardClass  = isDone ? 'done' : isIP ? 'in-progress' : '';
+
+  const priorityBadge = t.priority
+    ? `<span class="badge badge-${t.priority === 'High' ? 'high' : t.priority === 'Medium' ? 'med' : 'low'}">${t.priority}</span>`
+    : '';
+
+  let dateBadge = '';
+  if (t.dueDate) {
+    const today = new Date().toISOString().split('T')[0];
+    const over  = t.dueDate < today && !isDone;
+    dateBadge   = `<span class="badge ${over ? 'badge-overdue' : 'badge-date'}">📅 ${formatDate(t.dueDate)}</span>`;
+  }
+
+  const notesBadge = t.notes
+    ? `<span class="badge badge-notes" title="${escHtml(t.notes)}">📝 ${escHtml(t.notes)}</span>`
+    : '';
+
+  return `
+    <div class="task-card ${cardClass}" data-priority="${t.priority || ''}">
+      <button class="task-check ${checkClass}" data-id="${t.id}" data-status="${t.status}" aria-label="Toggle status"></button>
+      <div class="task-body">
+        <div class="task-name" data-id="${t.id}" role="button" tabindex="0">${escHtml(t.name)}</div>
+        ${(priorityBadge || dateBadge || notesBadge) ? `<div class="task-meta">${priorityBadge}${dateBadge}${notesBadge}</div>` : ''}
+      </div>
+      <button class="task-del" data-id="${t.id}" aria-label="Delete">✕</button>
+    </div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDate(d) {
+  const [y, m, day] = d.split('-');
+  return `${m}/${day}/${y.slice(2)}`;
+}
+
+// ─── Status cycle ─────────────────────────────────────────────────────────
+async function cycleStatus(id, current) {
+  const next = current === 'To Do' ? 'In Progress' : current === 'In Progress' ? 'Done' : 'To Do';
+  // optimistic update
+  const t = tasks.find(x => x.id === id);
+  if (t) t.status = next;
+  renderTasks();
+  try {
+    await api.patch(`/api/task/${id}`, { status: next });
+    showToast(`Marked: ${next}`);
+  } catch {
+    showToast('⚠️ Failed to update');
+    await loadTasks();
+  }
+}
+
+// ─── Delete ──────────────────────────────────────────────────────────────
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  tasks = tasks.filter(t => t.id !== id);
+  renderTasks();
+  try {
+    await api.del(`/api/task/${id}`);
+    showToast('Task deleted');
+  } catch {
+    showToast('⚠️ Failed to delete');
+    await loadTasks();
+  }
+}
+
+// ─── Add / Edit modal ────────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  modalTitle.textContent = 'Add Task';
+  taskName.value = '';
+  taskPriority.value = '';
+  taskDue.value = '';
+  taskNotes.value = '';
+  taskOrder.value = '';
+  modalOverlay.classList.add('open');
+  setTimeout(() => taskName.focus(), 300);
+}
+
+function openEditModal(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  editingId = id;
+  modalTitle.textContent = 'Edit Task';
+  taskName.value = t.name;
+  taskPriority.value = t.priority || '';
+  taskDue.value = t.dueDate || '';
+  taskNotes.value = t.notes || '';
+  taskOrder.value = t.order !== null ? t.order : '';
+  modalOverlay.classList.add('open');
+  setTimeout(() => taskName.focus(), 300);
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  editingId = null;
+}
+
+async function saveTask() {
+  const name = taskName.value.trim();
+  if (!name) { taskName.focus(); return; }
+
+  const payload = {
+    name,
+    priority: taskPriority.value || undefined,
+    dueDate: taskDue.value || undefined,
+    notes: taskNotes.value.trim() || undefined,
+    order: taskOrder.value !== '' ? Number(taskOrder.value) : undefined,
+  };
+
+  closeModal();
+
+  try {
+    if (editingId) {
+      const t = tasks.find(x => x.id === editingId);
+      if (t) Object.assign(t, { name: payload.name, priority: payload.priority || null, dueDate: payload.dueDate || null, notes: payload.notes || '', order: payload.order ?? null });
+      renderTasks();
+      await api.patch(`/api/task/${editingId}`, payload);
+      showToast('Task updated ✓');
+    } else {
+      const { id } = await api.post('/api/tasks', payload);
+      tasks.unshift({ id, status: 'To Do', ...payload, priority: payload.priority || null, dueDate: payload.dueDate || null, notes: payload.notes || '', order: payload.order ?? null });
+      renderTasks();
+      showToast('Task added ✓');
+    }
+  } catch {
+    showToast('⚠️ Save failed — check connection');
+    await loadTasks();
+  }
+}
+
+// ─── Quick voice add (FAB) ────────────────────────────────────────────────
+function startFabVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('Speech recognition not supported in this browser');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = 'en-US';
+  rec.continuous = false;
+  rec.interimResults = true;
+
+  voiceOverlay.classList.add('active');
+  voiceTranscript.textContent = 'Listening…';
+  fabVoice.classList.add('listening');
+
+  rec.onresult = e => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    voiceTranscript.textContent = transcript;
+  };
+
+  rec.onend = () => {
+    const heard = voiceTranscript.textContent;
+    voiceOverlay.classList.remove('active');
+    fabVoice.classList.remove('listening');
+    if (heard && heard !== 'Listening…') {
+      taskName.value = heard;
+      openAddModal();
+      taskName.value = heard;
+    }
+  };
+
+  rec.onerror = () => {
+    voiceOverlay.classList.remove('active');
+    fabVoice.classList.remove('listening');
+    showToast('Could not hear you — try again');
+  };
+
+  rec.start();
+  document.getElementById('voice-cancel').onclick = () => { rec.stop(); voiceOverlay.classList.remove('active'); fabVoice.classList.remove('listening'); };
+}
+
+// ─── Modal mic (dictate task name) ────────────────────────────────────────
+function startModalMic() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('Speech not supported');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang = 'en-US'; rec.continuous = false; rec.interimResults = true;
+  const mic = document.getElementById('modal-mic');
+  mic.classList.add('listening');
+  rec.onresult = e => {
+    taskName.value = Array.from(e.results).map(r => r[0].transcript).join('');
+  };
+  rec.onend = () => mic.classList.remove('listening');
+  rec.onerror = () => { mic.classList.remove('listening'); showToast('Could not hear — try again'); };
+  rec.start();
+}
+
+// ─── Voice output ────────────────────────────────────────────────────────
+function speakTasks() {
+  if (!synth) { showToast('Speech synthesis not supported'); return; }
+  if (isSpeaking) { synth.cancel(); isSpeaking = false; fabSpeak.classList.remove('speaking'); fabSpeak.textContent = '🔊'; return; }
+
+  const toRead = tasks.filter(t => t.status !== 'Done');
+  if (!toRead.length) { showToast('No active tasks to read'); return; }
+
+  const text = toRead.map((t, i) => {
+    let s = `Task ${i+1}: ${t.name}`;
+    if (t.priority) s += `, priority ${t.priority}`;
+    if (t.dueDate)  s += `, due ${formatDate(t.dueDate)}`;
+    return s;
+  }).join('. ');
+
+  const utt = new SpeechSynthesisUtterance(`You have ${toRead.length} active task${toRead.length !== 1 ? 's' : ''}. ${text}.`);
+  utt.rate = 0.95;
+  utt.onstart = () => { isSpeaking = true; fabSpeak.classList.add('speaking'); fabSpeak.textContent = '⏹'; };
+  utt.onend = utt.onerror = () => { isSpeaking = false; fabSpeak.classList.remove('speaking'); fabSpeak.textContent = '🔊'; };
+  synth.speak(utt);
+}
+
+// ─── Event listeners ────────────────────────────────────────────────────
+document.getElementById('btn-refresh').addEventListener('click', loadTasks);
+document.getElementById('fab-add').addEventListener('click', openAddModal);
+document.getElementById('fab-voice').addEventListener('click', startFabVoice);
+document.getElementById('fab-speak').addEventListener('click', speakTasks);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-save').addEventListener('click', saveTask);
+document.getElementById('modal-mic').addEventListener('click', startModalMic);
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderTasks();
+  });
+});
+
+taskName.addEventListener('keydown', e => { if (e.key === 'Enter') saveTask(); });
+
+// ─── PWA service worker ──────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ─── Boot ────────────────────────────────────────────────────────────────
+loadTasks();
+</script>
+</body>
+</html>
