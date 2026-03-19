@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
       const tasks = response.results.map(page => ({
         id: page.id,
         name: page.properties.Name?.title?.[0]?.text?.content || 'Untitled',
-        status: page.properties.Status?.status?.name || 'To Do',
+        status: page.properties.Status?.select?.name || 'To Do',
         priority: page.properties.Priority?.select?.name || 'Medium',
         dueDate: page.properties['Due Date']?.date?.start || null,
         order: page.properties.Order?.number ?? 999,
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
         parent: { database_id: TASKS_DB_ID },
         properties: {
           Name: { title: [{ text: { content: name || 'New Task' } }] },
-          Status: { status: { name: status || 'To Do' } },
+          Status: { select: { name: status || 'To Do' } },
           Priority: { select: { name: priority || 'Medium' } },
           ...(dueDate && { 'Due Date': { date: { start: dueDate } } }),
           ...(order !== undefined && { Order: { number: order } }),
