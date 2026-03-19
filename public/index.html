@@ -15,7 +15,7 @@
       --accent:#6c63ff;--accent2:#a78bfa;
       --text:#e2e8f0;--text2:#94a3b8;--border:#2d2d4e;
       --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
-      --radius:12px;
+      --radius:12p
     }
     body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
     .view{display:none;min-height:100vh;padding-bottom:100px}
@@ -244,7 +244,7 @@ function renderProjects(){
   var html='<div class="projects-grid">';
   allProjects.forEach(function(p){
     var col=projColor(p.id);
-    html+='<div class="proj-card" onclick="openProject('+JSON.stringify(p.id)+','+JSON.stringify(p.title)+')">'
+    html+='<div class="proj-card" onclick="openProject(\''+p.id+'\',\''+(p.title||'').replace(/'/g,"\\'")+'\')">'
       +'<div class="proj-top" style="background:'+col+'"></div>'
       +'<h3>'+esc(p.title)+'</h3>'
       +'<div class="proj-meta"><span style="color:'+col+'">&#9679;</span> Tap to open tasks</div>'
